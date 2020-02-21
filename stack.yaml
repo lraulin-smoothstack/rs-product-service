@@ -358,7 +358,7 @@ Resources:
                 Action:
                   - dynamodb:UpdateItem
                 Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-        - PolicyName: updateProduct
+        - PolicyName: deleteProduct
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
