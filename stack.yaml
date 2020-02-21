@@ -350,19 +350,19 @@ Resources:
                 Action:
                   - dynamodb:PutItem
                 Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-         - PolicyName: updateProduct
-           PolicyDocument:
-             Version: "2012-10-17"
-             Statement:
-               - Effect: Allow
-                 Action:
-                   - dynamodb:UpdateItem
-                 Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-         - PolicyName: updateProduct
-           PolicyDocument:
-             Version: "2012-10-17"
-             Statement:
-               - Effect: Allow
-                 Action:
-                   - dynamodb:DeleteItem
-                 Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
+        - PolicyName: updateProduct
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
+        - PolicyName: updateProduct
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
