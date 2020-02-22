@@ -46,26 +46,20 @@ const getProductById = (request, done) => {
 };
 
 const getProducts = (request, done) => {
-  // const params = {
-  //   TableName,
-  //   KeyConditionExpression: "#yr = :yyyy",
-  //   ExpressionAttributeNames: {
-  //     "#yr": "year",
-  //   },
-  //   ExpressionAttributeValues: {
-  //     ":yyyy": 1985,
-  //   },
-  // };
-  // documentClient.query(params, (err, data) => {
-  //   if (err) {
-  //     console.error("Unable to query. Error:", JSON.stringify(err, null, 2));
-  //   } else {
-  //     console.log("Query succeeded.");
-  //     data.Items.forEach(function(item) {
-  //       console.log(" -", item.year + ": " + item.title);
-  //     });
-  //   }
-  // });
+  const params = {
+    TableName,
+  };
+
+  documentClient.scan(params, (err, data) => {
+    if (err) {
+      console.error("Unable to query. Error:", JSON.stringify(err, null, 2));
+    } else {
+      console.log("Query succeeded.");
+      const products = data.Items;
+      console.log(products);
+      done(null, createResponse(products));
+    }
+  });
 };
 
 const createProduct = (Item, done) => {
