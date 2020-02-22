@@ -29,10 +29,10 @@ Resources:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
       AttributeDefinitions:
-        - AttributeName: user_id
-          AttributeType: S
+        - AttributeName: id
+          AttributeType: N
       KeySchema:
-        - AttributeName: user_id
+        - AttributeName: id
           KeyType: HASH
 
   # FIXME How to hook up custom domain?
@@ -58,19 +58,18 @@ Resources:
           - name: products
             description: Everything about the world's finest apparel products by Wu, Raulin & Co.
         paths:
-          /{proxy+}:
-            x-amazon-apigateway-integration:
-              uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-              credentials: !GetAtt MyApiGatewayRole.Arn
-              passthroughBehavior: when_no_match
-              httpMethod: POST
-              type: aws_proxy
           /products:
             get:
               tags:
                 - products
               summary: Finds products in the store
               description: Multiple status values can be provided with comma separated strings
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
+                credentials: !GetAtt MyApiGatewayRole.Arn
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
               operationId: readProducts
               parameters:
                 - name: department
@@ -105,6 +104,12 @@ Resources:
               tags:
                 - products
               summary: Creates a new product for the store
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
+                credentials: !GetAtt MyApiGatewayRole.Arn
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
               operationId: createProduct
               parameters:
                 - name: Authorization
@@ -117,8 +122,8 @@ Resources:
                   description: Product created
                 "405":
                   description: Invalid input
-              security:
-                - Bearer: []
+              # security:
+              #   - Bearer: []
               requestBody:
                 $ref: "#/components/requestBodies/Product"
           "/products/{product_id}":
@@ -127,6 +132,12 @@ Resources:
                 - products
               summary: Finds a product by ID
               description: Returns a single product
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
+                credentials: !GetAtt MyApiGatewayRole.Arn
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
               operationId: readProductById
               parameters:
                 - name: product_id
@@ -152,6 +163,12 @@ Resources:
               tags:
                 - products
               summary: Updates a product
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
+                credentials: !GetAtt MyApiGatewayRole.Arn
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
               operationId: updateProduct
               parameters:
                 - name: Authorization
@@ -171,14 +188,20 @@ Resources:
                   description: OK
                 "405":
                   description: Invalid input
-              security:
-                - Bearer: []
+              # security:
+              #   - Bearer: []
               requestBody:
                 $ref: "#/components/requestBodies/Product"
             delete:
               tags:
                 - products
               summary: Deletes a product
+              x-amazon-apigateway-integration:
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
+                credentials: !GetAtt MyApiGatewayRole.Arn
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
               operationId: deleteProduct
               parameters:
                 - name: Authorization
@@ -198,14 +221,8 @@ Resources:
                   description: Successfully deleted
                 "404":
                   description: Product not found
-              security:
-                - Bearer: []
-        externalDocs:
-          description: Find out more about Swagger
-          url: "http://swagger.io"
-        servers:
-          - url: "https://virtserver.swaggerhub.com/SmoothStack38/FashionStore/1.0.0"
-          - url: "http://virtserver.swaggerhub.com/SmoothStack38/FashionStore/1.0.0"
+              # security:
+              #   - Bearer: []
         components:
           requestBodies:
             Product:
@@ -218,11 +235,6 @@ Resources:
                     $ref: "#/components/schemas/Product"
               description: products object that needs to be added to the store
               required: true
-          securitySchemes:
-            Bearer:
-              type: apiKey
-              name: JWT
-              in: header
           schemas:
             Product:
               type: object
@@ -334,35 +346,15 @@ Resources:
       ManagedPolicyArns:
         - !Ref BaseLambdaExecutionPolicy
       Policies:
-        - PolicyName: readProducts
+        - PolicyName: productDbAccessPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - dynamodb:Scan
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-        - PolicyName: readProductById
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
                   - dynamodb:PutItem
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-        - PolicyName: updateProduct
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
                   - dynamodb:UpdateItem
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-        - PolicyName: deleteProduct
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
                   - dynamodb:DeleteItem
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
+                # Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/*"

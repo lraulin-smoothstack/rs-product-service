@@ -5,37 +5,21 @@ const AWS = require("aws-sdk");
 // Get "product" Dynamo table name.  Replace DEFAULT_VALUE
 // with the actual table name from your stack.
 const productDBArn =
-  process.env["product_DB"] || "test2-productTable-5ZFKMXTN6BDO"; //'Mark-productTable-1234567';
+  process.env["product_DB"] || "cccc-ProductTable-1V8RPWH4LL6SE"; //'Mark-productTable-1234567';
 const productDBArnArr = productDBArn.split("/");
 const productTableName = productDBArnArr[productDBArnArr.length - 1];
 
 // Generate a unique id
 const CUSTOMEPOCH = 1300000000000; // artificial epoch
-const generateRowId()=> {
-  const ts = new Date().getTime() - CUSTOMEPOCH; // limit to recent
+const generateRowId = () => {
+  let ts = new Date().getTime() - CUSTOMEPOCH; // limit to recent
   const randid = Math.floor(Math.random() * 512);
-  ts = (ts * 64);   // bit-shift << 6
-  return (ts * 512) + (randid % 512);
-}
-
-const scanTable = async tableName => {
-  const params = {
-    TableName: tableName,
-  };
-
-  let scanResults = [];
-  let items;
-  do {
-    items = await documentClient.scan(params).promise();
-    items.Items.forEach(item => scanResults.push(item));
-    params.ExclusiveStartKey = items.LastEvaluatedKey;
-  } while (typeof items.LastEvaluatedKey != "undefined");
-
-  return scanResults;
+  ts = ts * 64; // bit-shift << 6
+  return ts * 512 + (randid % 512);
 };
 
 // handleHttpRequest is the entry point for Lambda requests
-exports.handleHttpRequest = async (request, context, done) => {
+exports.handleHttpRequest = (request, context, done) => {
   try {
     // const userId = request.pathParameters.userId;
     let response = {
@@ -49,7 +33,7 @@ exports.handleHttpRequest = async (request, context, done) => {
         console.log("GET");
         const dynamo = new AWS.DynamoDB();
         // Call DynamoDB to read the items from the table
-        const scanResults = await scan(productTableName);
+        const scanResults = dynamo.scan(productTableName);
         response.body = JSON.stringify(scanResults);
         break;
       }
@@ -57,31 +41,50 @@ exports.handleHttpRequest = async (request, context, done) => {
         console.log("POST");
         // TODO: check that department is valid before insert
         const bodyJSON = JSON.parse(request.body || "{}");
+        for (let key of Object.keys(bodyJSON)) {
+          if (typeof bodyJSON[key] == "number") {
+            bodyJSON[key] = bodyJSON[key].toString();
+          }
+        }
+        console.log("???????? REQUEST BODY ????????");
         console.log(bodyJSON);
-        // const dynamo = new AWS.DynamoDB();
-        // const params = {
-        //   TableName: productTableName,
-        //   Item: {
-        //     id: { N: generateRowId() },
-        //     name: { S: bodyJSON["name"] },
-        //     description: { S: bodyJSON["description"] },
-        //     department: { S: bodyJSON["department"] },
-        //     category: { S: bodyJSON["category"] },
-        //     photo_url: { S: bodyJSON["photo_url"] },
-        //     wholesale_price: { N: bodyJSON["wholesale_price"] },
-        //     retail_price: { N: bodyJSON["retail_price"] },
-        //     stock: { N: bodyJSON["stock"] },
-        //     discountable: { BOOL: bodyJSON["discountable"] },
-        //   },
-        // };
-        // dynamo.putItem(params, (error, data) => {
-        //   if (error) throw `Dynamo Error (${error})`;
-        //   else done(null, response);
-        // });
+        // const documentClient = new AWS.DynamoDB.DocumentClient();
+        const dynamo = new AWS.DynamoDB();
+
+        const params = {
+          TableName: productTableName,
+          Item: {
+            id: { N: bodyJSON.id },
+            name: { S: bodyJSON.name },
+            description: { S: bodyJSON.description },
+            department: { S: bodyJSON.department },
+            category: { S: bodyJSON.category },
+            photo_url: { S: bodyJSON.photo_url },
+            wholesale_price: { N: bodyJSON.wholesale_price },
+            retail_price: { N: bodyJSON.retail_price },
+            stock: { N: bodyJSON.stock },
+            discountable: { BOOL: bodyJSON.discountable },
+          },
+        };
+        console.log("READY...........");
+        console.log(params);
+        dynamo.putItem(params, (error, data) => {
+          if (error) {
+            console.log("*********ERROR*********");
+            console.log(error);
+          } else {
+            response.body = JSON.stringify(data);
+            console.log("!!!!!!!!HEY!!!!!!!!!");
+            console.log(response);
+            done(null, response);
+          }
+        });
         break;
       }
     }
   } catch (e) {
+    console.log("$$$$$$$FINAL CATCH$$$$$$$$");
+    console.log(e);
     done(e, null);
   }
 };
