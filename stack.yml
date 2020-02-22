@@ -4,7 +4,6 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: API Gateway, Lambda, and Dynamo.
 
 Resources:
-  # Policy required for all lambda function roles.
   BaseLambdaExecutionPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -35,7 +34,6 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
-  # FIXME How to hook up custom domain?
   ProductApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -327,7 +325,6 @@ Resources:
       Runtime: nodejs12.x
       Environment:
         Variables:
-          Product_DB: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
           TABLE_NAME: !Select [1, !Split ["/", !GetAtt ProductTable.Arn]]
       Code:
         ZipFile: |
