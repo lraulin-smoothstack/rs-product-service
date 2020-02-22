@@ -36,10 +36,10 @@ Resources:
           KeyType: HASH
 
   # FIXME How to hook up custom domain?
-  MyApiGateway:
+  ProductApiGateway:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub "${AWS::StackName}-MyApiGateway"
+      Name: !Sub "${AWS::StackName}-ProductApiGateway"
       Description: A description
       FailOnWarnings: true
       Body:
@@ -66,7 +66,7 @@ Resources:
               description: Multiple status values can be provided with comma separated strings
               x-amazon-apigateway-integration:
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-                credentials: !GetAtt MyApiGatewayRole.Arn
+                credentials: !GetAtt ProductApiGatewayRole.Arn
                 passthroughBehavior: when_no_match
                 httpMethod: POST
                 type: aws_proxy
@@ -106,7 +106,7 @@ Resources:
               summary: Creates a new product for the store
               x-amazon-apigateway-integration:
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-                credentials: !GetAtt MyApiGatewayRole.Arn
+                credentials: !GetAtt ProductApiGatewayRole.Arn
                 passthroughBehavior: when_no_match
                 httpMethod: POST
                 type: aws_proxy
@@ -134,7 +134,7 @@ Resources:
               description: Returns a single product
               x-amazon-apigateway-integration:
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-                credentials: !GetAtt MyApiGatewayRole.Arn
+                credentials: !GetAtt ProductApiGatewayRole.Arn
                 passthroughBehavior: when_no_match
                 httpMethod: POST
                 type: aws_proxy
@@ -165,7 +165,7 @@ Resources:
               summary: Updates a product
               x-amazon-apigateway-integration:
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-                credentials: !GetAtt MyApiGatewayRole.Arn
+                credentials: !GetAtt ProductApiGatewayRole.Arn
                 passthroughBehavior: when_no_match
                 httpMethod: POST
                 type: aws_proxy
@@ -198,7 +198,7 @@ Resources:
               summary: Deletes a product
               x-amazon-apigateway-integration:
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductLambda.Arn}/invocations"
-                credentials: !GetAtt MyApiGatewayRole.Arn
+                credentials: !GetAtt ProductApiGatewayRole.Arn
                 passthroughBehavior: when_no_match
                 httpMethod: POST
                 type: aws_proxy
@@ -293,13 +293,13 @@ Resources:
                   items:
                     type: object
 
-  MyApiGatewayDeployment:
+  ProductApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     Properties:
-      RestApiId: !Ref MyApiGateway
+      RestApiId: !Ref ProductApiGateway
       StageName: prod
 
-  MyApiGatewayRole:
+  ProductApiGatewayRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -317,8 +317,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
-                Resource:
-                  - !GetAtt ProductLambda.Arn
+                Resource: !GetAtt ProductLambda.Arn
 
   ProductLambda:
     Type: AWS::Lambda::Function
@@ -329,6 +328,7 @@ Resources:
       Environment:
         Variables:
           Product_DB: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
+          TABLE_NAME: !Select [1, !Split ["/", !GetAtt ProductTable.Arn]]
       Code:
         ZipFile: |
           exports.handlers = function(event, context) {}
@@ -352,9 +352,5 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - dynamodb:Scan
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:DeleteItem
-                # Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/${ProductTable}"
-                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:*:table/*"
+                  - dynamodb:*
+                Resource: !GetAtt ProductTable.Arn

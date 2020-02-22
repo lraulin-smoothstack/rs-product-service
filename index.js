@@ -1,58 +1,77 @@
 "use strict";
 
+// Get table name
+const productDBArn = process.env["Product_DB"]; //'Mark-productTable-1234567';
+const productDBArnArr = productDBArn.split("/");
+const TableName = productDBArnArr[productDBArnArr.length - 1];
+
+// Create connection
 const AWS = require("aws-sdk");
 
-// Get "product" Dynamo table name.  Replace DEFAULT_VALUE
-// with the actual table name from your stack.
-const productDBArn =
-  process.env["product_DB"] || "cccc-ProductTable-1V8RPWH4LL6SE"; //'Mark-productTable-1234567';
-const productDBArnArr = productDBArn.split("/");
-const productTableName = productDBArnArr[productDBArnArr.length - 1];
+AWS.config.update({
+  region: "us-east-1",
+});
 
-// Generate a unique id
-const CUSTOMEPOCH = 1300000000000; // artificial epoch
-const generateRowId = () => {
-  let ts = new Date().getTime() - CUSTOMEPOCH; // limit to recent
-  const randid = Math.floor(Math.random() * 512);
-  ts = ts * 64; // bit-shift << 6
-  return ts * 512 + (randid % 512);
+const dynamoDB = new AWS.DynamoDB({ apiVersion: "2012-08-10" });
+const documentClient = new AWS.DynamoDB.DocumentClient({
+  httpOptions: {
+    timeout: 5000,
+  },
+});
+
+const createResponse = ({
+  headers = {},
+  body = "",
+  statusCode = 200,
+} = {}) => ({
+  headers,
+  body,
+  statusCode,
+});
+
+const getAllProducts = done => {
+  const params = {
+    TableName,
+    Key: { id: 2 },
+  };
+
+  documentClient.get(params, (err, data) => {
+    if (err) {
+      console.log("Error", err);
+      done(err, null);
+    } else {
+      console.log("Success", data.Item);
+      done(null, createResponse({ body: data.Item }));
+    }
+  });
 };
 
 // handleHttpRequest is the entry point for Lambda requests
 exports.handleHttpRequest = (request, context, done) => {
   try {
-    // const userId = request.pathParameters.userId;
-    let response = {
-      headers: {},
-      body: "",
-      statusCode: 200,
-    };
-
     switch (request.httpMethod) {
       case "GET": {
         console.log("GET");
-        const dynamo = new AWS.DynamoDB();
-        // Call DynamoDB to read the items from the table
-        const scanResults = dynamo.scan(productTableName);
-        response.body = JSON.stringify(scanResults);
+
+        getAllProducts(done);
+
         break;
       }
       case "POST": {
         console.log("POST");
         // TODO: check that department is valid before insert
+
+        // There has to be a better way, but...
         const bodyJSON = JSON.parse(request.body || "{}");
         for (let key of Object.keys(bodyJSON)) {
           if (typeof bodyJSON[key] == "number") {
             bodyJSON[key] = bodyJSON[key].toString();
           }
         }
-        console.log("???????? REQUEST BODY ????????");
-        console.log(bodyJSON);
-        // const documentClient = new AWS.DynamoDB.DocumentClient();
         const dynamo = new AWS.DynamoDB();
 
         const params = {
-          TableName: productTableName,
+          TableName,
           Item: {
             id: { N: bodyJSON.id },
             name: { S: bodyJSON.name },
@@ -66,25 +85,17 @@ exports.handleHttpRequest = (request, context, done) => {
             discountable: { BOOL: bodyJSON.discountable },
           },
         };
-        console.log("READY...........");
-        console.log(params);
         dynamo.putItem(params, (error, data) => {
           if (error) {
-            console.log("*********ERROR*********");
             console.log(error);
           } else {
-            response.body = JSON.stringify(data);
-            console.log("!!!!!!!!HEY!!!!!!!!!");
-            console.log(response);
-            done(null, response);
+            done(null, createResponse({ body: data }));
           }
         });
         break;
       }
     }
   } catch (e) {
-    console.log("$$$$$$$FINAL CATCH$$$$$$$$");
-    console.log(e);
     done(e, null);
   }
 };
