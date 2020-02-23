@@ -67,6 +67,24 @@ const allowOrDeny = event => {
   const method = getMethod(event.methodArn);
   console.log("METHOD: " + method);
   const resource = getResource;
+
+  // GET /products
+  if (method === "GET" && resource === "/products") {
+    return allowPolicy(event.methodArn);
+  }
+
+  // GET /products/{product_id}
+  if (method === "GET" && resource === "/products/{product_id}") {
+    return allowPolicy(event.methodArn);
+  }
+
+  // POST /products
+  if (method === "POST" && resource === "/products" && ["clerk", "admin"]) {
+    return allowPolicy(event.methodArn);
+  }
+
+  // Default case
+  return denyAllPolicy();
 };
 
 /**
