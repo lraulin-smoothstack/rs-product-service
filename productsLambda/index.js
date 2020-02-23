@@ -125,6 +125,9 @@ const bulkCreateProducts = (request, done) => {
   });
 };
 
+/**
+ * Request evaluators.
+ */
 // GET /products
 const isGetProductsRequest = request =>
   request.httpMethod === "GET" && request.resource === "/products";
@@ -137,10 +140,10 @@ const isGetProductByIdRequest = request =>
 const isPostProductsRequest = request =>
   request.httpMethod === "POST" && request.resource === "/products";
 
-// handleHttpRequest is the entry point for Lambda requests
+/**
+ * Entry point.
+ */
 exports.handleHttpRequest = (request, context, done) => {
-  console.log("!!! REQUEST !!!");
-  console.log(JSON.stringify(request));
   try {
     if (isGetProductsRequest(request)) {
       console.log("GET /products");

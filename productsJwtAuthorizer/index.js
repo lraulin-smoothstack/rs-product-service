@@ -53,29 +53,29 @@ const getResource = arn =>
     .slice(3)
     .join("/");
 
+/**
+ * Logic for resource access by role
+ */
+const allowOrDeny = event => {
+  const encodedToken = getEncodedToken(event.authorizationToken);
+  const token = jwt.decode(encodedToken, { complete: true });
+  // const jwk = await getJwkByKid(token.payload.iss, token.header.kid);
+  // const pem = jwkToPem(jwk);
+  // jwt.verify(encodedToken, pem);
+  const role = token.payload.role;
+  console.log("ROLE: " + role);
+  const method = getMethod(event.methodArn);
+  console.log("METHOD: " + method);
+  const resource = getResource;
+};
+
+/**
+ * Entry point
+ */
 exports.handler = async event => {
-  console.log("<><><> HEY! From authorizer handler! <><><>");
-  console.log(JSON.stringify(event));
   try {
-    const encodedToken = getEncodedToken(event.authorizationToken);
-    const token = jwt.decode(encodedToken, { complete: true });
-    // const jwk = await getJwkByKid(token.payload.iss, token.header.kid);
-    // const pem = jwkToPem(jwk);
-    // jwt.verify(encodedToken, pem);
-    const role = token.payload.role;
-    console.log("ROLE: " + role);
-    const method = getMethod(event.methodArn);
-    console.log("METHOD: " + method);
-    const resource = getResource;
-    console.log("RESOURCE: " + resource);
-
-    /**
-     * TODO: logic for resource access by role
-     */
-
-    return allowPolicy(event.methodArn);
+    allowOrDeny(event);
   } catch (error) {
-    console.log("^^^ Authorization Error ^^^");
     console.error(error.message);
     return denyAllPolicy();
   }
