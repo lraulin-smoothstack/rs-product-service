@@ -1,7 +1,7 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: API Gateway, Lambda, and Dynamo.
+Description: Development API Gateway for Products Lambda
 
 Resources:
   BaseLambdaExecutionPolicy:
@@ -20,19 +20,6 @@ Resources:
               - ec2:DescribeNetworkInterfaces
               - ec2:DeleteNetworkInterface
             Resource: "*"
-
-  ProductTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: N
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
 
   ProductApiGateway:
     Type: AWS::ApiGateway::RestApi
@@ -325,7 +312,9 @@ Resources:
       Runtime: nodejs12.x
       Environment:
         Variables:
-          TABLE_NAME: !Select [1, !Split ["/", !GetAtt ProductTable.Arn]]
+          DBHOST: redemption-store.cfqzqwlbrir7.us-east-1.rds.amazonaws.com
+          DBUSER: admin
+          DBPASSWORD: RAsmUKKzbhzXYZ91P9hP
       Code:
         ZipFile: |
           exports.handlers = function(event, context) {}
@@ -342,12 +331,3 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Ref BaseLambdaExecutionPolicy
-      Policies:
-        - PolicyName: productDbAccessPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:*
-                Resource: !GetAtt ProductTable.Arn
