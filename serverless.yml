@@ -6,7 +6,6 @@ provider:
   stage: dev
   region: us-east-1
   memorySize: 768
-
 functions:
   coupons:
     handler: index.handler
@@ -21,10 +20,10 @@ functions:
           path: products
           method: post
       - http:
-          path: products/{code}
+          path: products/{id}
           method: put
       - http:
-          path: products/{code}
+          path: products/{id}
           method: delete
-# plugins:
+# # plugins:
 #   - serverless-offline

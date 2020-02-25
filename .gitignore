@@ -1,6 +1,7 @@
 mysql-config.*
 config.json
-*secrets*
+.sectrets
+*secret*
 
 # Logs
 logs
