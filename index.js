@@ -3,17 +3,16 @@ const serverless = require("serverless-http");
 const bodyParser = require("body-parser");
 const accepts = require("accepts");
 const js2xmlparser = require("js2xmlparser");
-const db = require("./db");
 const app = express();
 
 const mysql = require("mysql");
-require("dotenv").config();
+// require("dotenv").config();
 
 const connection = mysql.createConnection({
-  host: process.env.DBHOST,
-  user: process.env.DBUSER,
-  password: process.env.DBPASSWORD,
-  database: "redemption_store",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
 module.exports = connection;
@@ -26,7 +25,7 @@ const columns =
 
 app.get("/products", (request, response) => {
   const accept = accepts(request);
-  db.query("SELECT * FROM product", (error, results) => {
+  connection.query("SELECT * FROM product", (error, results) => {
     if (error) {
       response.status(404);
       response.send();
@@ -40,7 +39,7 @@ app.get("/products", (request, response) => {
         case "xml":
           response.setHeader("Content-Type", "application/xml");
           response.status(200);
-          response.send(js2xmlparser.parse("coupons", results));
+          response.send(js2xmlparser.parse("products", results));
           break;
         default:
           response.status(406);
@@ -53,8 +52,8 @@ app.get("/products", (request, response) => {
 
 app.get("/products/:id", (request, response) => {
   const accept = accepts(request);
-  db.query(
-    "SELECT * FROM product where code = ?",
+  connection.query(
+    "SELECT * FROM product where id = ?",
     [request.params.id],
     (error, results) => {
       if (error || results.length == 0) {
@@ -70,7 +69,7 @@ app.get("/products/:id", (request, response) => {
           case "xml":
             response.setHeader("Content-Type", "application/xml");
             response.status(200);
-            response.send(js2xmlparser.parse("coupons", results));
+            response.send(js2xmlparser.parse("products", results));
             break;
           default:
             response.status(406);
@@ -83,7 +82,7 @@ app.get("/products/:id", (request, response) => {
 });
 
 app.post("/products", (request, response) => {
-  db.query(
+  connection.query(
     `INSERT INTO product (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       request.body.name,
@@ -125,7 +124,7 @@ app.put("/products/:id", (request, response) => {
     request.params.id,
   ];
 
-  db.query(sql, values, (error, results) => {
+  connection.query(sql, values, (error, results) => {
     if (error || results.affectedRows == 0) {
       response.status(400);
       response.send();
@@ -137,7 +136,7 @@ app.put("/products/:id", (request, response) => {
 });
 
 app.delete("/products/:id", (request, response) => {
-  db.query(
+  connection.query(
     "UPDATE product SET deleted = ? WHERE id = ?",
     [current, request.params.id],
     (error, results) => {
