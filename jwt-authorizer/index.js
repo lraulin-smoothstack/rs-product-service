@@ -32,7 +32,13 @@ const allowPolicy = methodArn => ({
   },
 });
 
-const getEncodedToken = header => header.split(" ")[1];
+// const getEncodedToken = header => {
+//   try {
+//     header.split(" ")[1];
+//   } catch {
+//     return null;
+//   }
+// };
 
 // const getJwkByKid = async (iss, kid) => {
 //   const jwksendpoint = iss + "/.well-known/jwks.json";
@@ -48,6 +54,7 @@ const getEncodedToken = header => header.split(" ")[1];
 const getMethod = arn => arn.split("/")[2];
 
 const getResource = arn =>
+  "/" +
   arn
     .split("/")
     .slice(3)
@@ -56,8 +63,9 @@ const getResource = arn =>
 /**
  * Logic for resource access by role
  */
-const allowOrDeny = event => {
-  const encodedToken = getEncodedToken(event.authorizationToken);
+const allowOrDenyPolicy = event => {
+  // const encodedToken = getEncodedToken(event.authorizationToken);
+  const encodedToken = event.authorizationToken;
   const token = jwt.decode(encodedToken, { complete: true });
   // const jwk = await getJwkByKid(token.payload.iss, token.header.kid);
   // const pem = jwkToPem(jwk);
@@ -66,10 +74,16 @@ const allowOrDeny = event => {
   console.log("ROLE: " + role);
   const method = getMethod(event.methodArn);
   console.log("METHOD: " + method);
-  const resource = getResource;
+  const resource = getResource(event.methodArn);
+  console.log("RESOURCE: " + resource);
 
+  console.log(`User with role ${role} attempting a ${method} on ${resource}`);
   // GET /products
-  if (method === "GET" && resource === "/products") {
+  if (
+    method === "GET" &&
+    resource === "/products" &&
+    ["customer", "clerk", "admin"].includes(role)
+  ) {
     return allowPolicy(event.methodArn);
   }
 
@@ -79,8 +93,17 @@ const allowOrDeny = event => {
   }
 
   // POST /products
-  if (method === "POST" && resource === "/products" && ["clerk", "admin"]) {
-    return allowPolicy(event.methodArn);
+  if (method === "POST" && resource === "/products") {
+    console.log("POST /products");
+    const authorizedRoles = ["clerk", "admin"];
+    const authorized = authorizedRoles.includes(role);
+    if (authorized) {
+      console.log("AUTHORIZED");
+      return allowPolicy(event.methodArn);
+    } else {
+      console.log("NOT AUTHORIZED");
+      return denyAllPolicy();
+    }
   }
 
   // Default case
@@ -91,8 +114,9 @@ const allowOrDeny = event => {
  * Entry point
  */
 exports.handler = async event => {
+  console.log(event);
   try {
-    allowOrDeny(event);
+    return allowOrDenyPolicy(event);
   } catch (error) {
     console.error(error.message);
     return denyAllPolicy();

@@ -1,10 +1,10 @@
 {
-  "name": "products-jwt-authorizer",
+  "name": "jwt-authorizer",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "zip -r products_authorizer.zip .",
+    "build": "zip -r jwt-authorizer.zip .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

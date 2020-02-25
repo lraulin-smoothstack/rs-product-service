@@ -1,0 +1,16 @@
+{
+  "name": "products-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda products microservice for clothing e-commerce store.",
+  "main": "index.js",
+  "scripts": {
+    "build": "zip -r productsLambda.zip .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Lee M. Raulin",
+  "license": "MIT",
+  "dependencies": {
+    "mysql": "^2.18.1"
+  }
+}

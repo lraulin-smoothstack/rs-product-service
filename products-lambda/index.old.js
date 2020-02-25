@@ -1,6 +1,6 @@
 "use strict";
 
-const db = require("./db");
+const db = require("./src/db");
 
 /**
  * Request evaluators.
@@ -31,18 +31,19 @@ const isDeleteProductByIdRequest = request =>
  * Entry point.
  */
 exports.handleHttpRequest = (request, context, done) => {
+  console.log(request);
   try {
     if (isGetProductsRequest(request)) {
       console.log("GET /products");
-      db.getProducts(request, done);
+      db.getProducts(done);
     }
     if (isPostProductsRequest(request)) {
       console.log("POST /products");
-      db.bulkCreateProducts(request, done);
+      db.bulkAddProducts(request, done);
     }
     if (isGetProductByIdRequest(request)) {
       console.log("GET /products/{product_id}");
-      db.getProductById(request, done);
+      db.getProductById(request.id, done);
     }
     if (isPutProductByIdRequest(request)) {
       console.log("PUT /products/{product_id}");
@@ -50,7 +51,7 @@ exports.handleHttpRequest = (request, context, done) => {
     }
     if (isDeleteProductByIdRequest(request)) {
       console.log("DELETE /products/{product_id}");
-      db.archiveProduct(request, done);
+      db.archiveProduct(request.id, done);
     }
   } catch (e) {
     done(e, null);
