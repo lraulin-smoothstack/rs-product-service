@@ -3,56 +3,57 @@ const serverless = require("serverless-http");
 const bodyParser = require("body-parser");
 const accepts = require("accepts");
 const js2xmlparser = require("js2xmlparser");
+const db = require("./db");
 const app = express();
 
-const mysql = require("mysql");
-// require("dotenv").config();
+// create application/json parser
+const jsonParser = bodyParser.json();
 
-const connection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
+// create application/x-www-form-urlencoded parser
+const urlencodedParser = bodyParser.urlencoded({ extended: true });
 
-module.exports = connection;
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(urlencodedParser);
+app.use(jsonParser);
 
 const columns =
   "name, description, category, department, photo_url, wholesale_price_cents, retail_price_cents, discountable, stock, deleted";
 
 app.get("/products", (request, response) => {
   const accept = accepts(request);
-  connection.query("SELECT * FROM product", (error, results) => {
-    if (error) {
-      response.status(404);
-      response.send();
-    } else {
-      switch (accept.type(["json", "xml"])) {
-        case "json":
-          response.setHeader("Content-Type", "application/json");
-          response.status(200);
-          response.send(results);
-          break;
-        case "xml":
-          response.setHeader("Content-Type", "application/xml");
-          response.status(200);
-          response.send(js2xmlparser.parse("products", results));
-          break;
-        default:
-          response.status(406);
-          response.send();
-          break;
+  const category = request.query.category || "%";
+  const department = request.query.department || "%";
+  db.query(
+    "SELECT * FROM product WHERE department LIKE ? AND category LIKE ? AND deleted = 0;",
+    [department, category],
+    (error, results) => {
+      if (error) {
+        response.status(404);
+        response.send();
+      } else {
+        switch (accept.type(["json", "xml"])) {
+          case "json":
+            response.setHeader("Content-Type", "application/json");
+            response.status(200);
+            response.send(results);
+            break;
+          case "xml":
+            response.setHeader("Content-Type", "application/xml");
+            response.status(200);
+            response.send(js2xmlparser.parse("coupons", results));
+            break;
+          default:
+            response.status(406);
+            response.send();
+            break;
+        }
       }
-    }
-  });
+    },
+  );
 });
 
 app.get("/products/:id", (request, response) => {
   const accept = accepts(request);
-  connection.query(
+  db.query(
     "SELECT * FROM product where id = ?",
     [request.params.id],
     (error, results) => {
@@ -69,7 +70,7 @@ app.get("/products/:id", (request, response) => {
           case "xml":
             response.setHeader("Content-Type", "application/xml");
             response.status(200);
-            response.send(js2xmlparser.parse("products", results));
+            response.send(js2xmlparser.parse("coupons", results));
             break;
           default:
             response.status(406);
@@ -82,7 +83,7 @@ app.get("/products/:id", (request, response) => {
 });
 
 app.post("/products", (request, response) => {
-  connection.query(
+  db.query(
     `INSERT INTO product (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       request.body.name,
@@ -124,7 +125,7 @@ app.put("/products/:id", (request, response) => {
     request.params.id,
   ];
 
-  connection.query(sql, values, (error, results) => {
+  db.query(sql, values, (error, results) => {
     if (error || results.affectedRows == 0) {
       response.status(400);
       response.send();
@@ -136,9 +137,9 @@ app.put("/products/:id", (request, response) => {
 });
 
 app.delete("/products/:id", (request, response) => {
-  connection.query(
+  db.query(
     "UPDATE product SET deleted = ? WHERE id = ?",
-    [current, request.params.id],
+    [1, request.params.id],
     (error, results) => {
       if (error || results.affectedRows == 0) {
         response.status(400);
