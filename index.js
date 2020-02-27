@@ -1,160 +1,163 @@
-"use strict";
+const express = require("express");
+const serverless = require("serverless-http");
+const bodyParser = require("body-parser");
+const accepts = require("accepts");
+const js2xmlparser = require("js2xmlparser");
+const db = require("./db");
+const app = express();
 
-/**
- * Database connection
- */
-const TableName = process.env["TABLE_NAME"];
-const AWS = require("aws-sdk");
-// TODO: Get region from env
-AWS.config.update({
-  region: "us-east-1",
-});
-const documentClient = new AWS.DynamoDB.DocumentClient({
-  httpOptions: {
-    timeout: 5000,
-  },
-});
+// create application/json parser
+const jsonParser = bodyParser.json();
 
-/**
- * Utility functions
- */
-const createResponse = responseBody => ({
-  statusCode: 200,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(responseBody),
-  isBase64Encoded: false,
-});
+// create application/x-www-form-urlencoded parser
+const urlencodedParser = bodyParser.urlencoded({ extended: true });
 
-/**
- * CRUD functions
- */
-const getProductById = (request, done) => {
-  const params = {
-    TableName,
-    Key: { id: request.pathParameters.product_id },
-  };
+app.use(urlencodedParser);
+app.use(jsonParser);
 
-  documentClient.get(params, (err, data) => {
-    if (err) {
-      console.log("getAllProducts--ERROR");
-      console.log(err);
-      done(err, null);
-    } else {
-      done(null, createResponse(data.Item));
-    }
-  });
-};
+const columns =
+  "name, description, category, department, photo_url, wholesale_price_cents, retail_price_cents, discountable, stock, deleted";
 
-const getProducts = (request, done) => {
-  const params = {
-    TableName,
-  };
-
-  documentClient.scan(params, (err, data) => {
-    if (err) {
-      console.error("Unable to query. Error:", JSON.stringify(err, null, 2));
-    } else {
-      console.log("Query succeeded.");
-      const products = data.Items;
-      console.log(products);
-      done(null, createResponse(products));
-    }
-  });
-};
-
-const createProduct = (Item, done) => {
-  const params = {
-    TableName,
-    Item,
-    ConditionExpression: "attribute_not_exists(id)",
-  };
-
-  documentClient.put(params, (error, data) => {
-    if (error) {
-      console.log(error);
-      done(error, null);
-    } else {
-      console.log("createProduct: SUCCESS!");
-      done(null, createResponse(data));
-    }
-  });
-};
-
-const bulkCreateProducts = (request, done) => {
-  const products = JSON.parse(request.body);
-
-  const createPutRequest = Item => ({
-    PutRequest: {
-      Item,
+app.get("/products", (request, response) => {
+  const accept = accepts(request);
+  let category = request.query.category;
+  let department = request.query.department;
+  if (category == undefined) category = "%";
+  if (department == undefined) department = "%";
+  db.query(
+    "SELECT * FROM product WHERE department LIKE ? AND category LIKE ? AND DELETED = 0;",
+    [department, category],
+    (error, results) => {
+      if (error) {
+        response.status(404);
+        response.send();
+      } else {
+        switch (accept.type(["json", "xml"])) {
+          case "json":
+            response.setHeader("Content-Type", "application/json");
+            response.status(200);
+            response.send(results);
+            break;
+          case "xml":
+            response.setHeader("Content-Type", "application/xml");
+            response.status(200);
+            response.send(js2xmlparser.parse("coupons", results));
+            break;
+          default:
+            response.status(406);
+            response.send();
+            break;
+        }
+      }
     },
-  });
+  );
+});
 
-  const params = {
-    RequestItems: {
-      [TableName]: products.map(p => createPutRequest(p)),
+app.get("/products/:id", (request, response) => {
+  const accept = accepts(request);
+  db.query(
+    "SELECT * FROM product where id = ?",
+    [request.params.id],
+    (error, results) => {
+      if (error || results.length == 0) {
+        response.status(404);
+        response.send();
+      } else {
+        switch (accept.type(["json", "xml"])) {
+          case "json":
+            response.setHeader("Content-Type", "application/json");
+            response.status(200);
+            response.send(results);
+            break;
+          case "xml":
+            response.setHeader("Content-Type", "application/xml");
+            response.status(200);
+            response.send(js2xmlparser.parse("coupons", results));
+            break;
+          default:
+            response.status(406);
+            response.send();
+            break;
+        }
+      }
     },
-  };
+  );
+});
 
-  console.log("* * * * bulkCreateProducts: params * * * *");
-  console.log(JSON.stringify(params));
+app.post("/products", (request, response) => {
+  db.query(
+    `INSERT INTO product (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      request.body.name,
+      request.body.description,
+      request.body.category,
+      request.body.department,
+      request.body.photo_url,
+      request.body.wholesale_price_cents,
+      request.body.retail_price_cents,
+      request.body.discountable,
+      request.body.stock,
+      false,
+    ],
+    (error, results) => {
+      if (error || results.affectedRows == 0) {
+        response.status(400);
+        response.send();
+      } else {
+        response.status(201);
+        response.send();
+      }
+    },
+  );
+});
 
-  // const processItemsCallback = function(err, data) {
-  //   if (err) {
-  //     console.log(err);
-  //     done(err, null);
-  //   } else {
-  //     const params = {};
-  //     params.RequestItems = data.UnprocessedItems;
-  //     if (Object.keys(params.RequestItems).length !== 0) {
-  //       db.batchWriteItem(params, processItemsCallback);
-  //     } else {
-  //       console.log(data);
-  //       done(null, createResponse(data));
-  //     }
-  //   }
-  // };
+app.put("/products/:id", (request, response) => {
+  console.log("DOING PUT ON PRODUCT ID: " + request.params.id);
+  console.log("REQUEST: ");
+  console.log(request);
+  console.log("REQEST BODY: ");
+  console.log(request.body);
 
-  documentClient.batchWrite(params, (err, data) => {
-    if (err) {
-      console.log(err);
-      done(err, null);
+  const sql =
+    "UPDATE product SET name = ?, description = ?, category = ?, department = ?, photo_url = ?, wholesale_price_cents = ?, retail_price_cents = ?, discountable = ?, stock = ? WHERE id = ?";
+  const values = [
+    request.body.name,
+    request.body.description,
+    request.body.category,
+    request.body.department,
+    request.body.photo_url,
+    request.body.wholesale_price_cents,
+    request.body.retail_price_cents,
+    request.body.discountable,
+    request.body.stock,
+    request.params.id,
+  ];
+
+  db.query(sql, values, (error, results) => {
+    if (error || results.affectedRows == 0) {
+      response.status(400);
+      response.send();
     } else {
-      console.log(data);
-      done(null, createResponse(data));
+      response.status(204);
+      response.send();
     }
   });
-};
+});
 
-// GET /products
-const isGetProductsRequest = request =>
-  request.httpMethod === "GET" && request.resource === "/products";
+app.delete("/products/:id", (request, response) => {
+  db.query(
+    "UPDATE product SET deleted = ? WHERE id = ?",
+    [1, request.params.id],
+    (error, results) => {
+      if (error || results.affectedRows == 0) {
+        response.status(400);
+        response.send();
+      } else {
+        response.status(204);
+        response.send();
+      }
+    },
+  );
+});
 
-// GET /products/{product_id}
-const isGetProductByIdRequest = request =>
-  request.httpMethod === "GET" && request.resource === "/products/{product_id}";
-
-// POST /products
-const isPostProductsRequest = request =>
-  request.httpMethod === "POST" && request.resource === "/products";
-
-// handleHttpRequest is the entry point for Lambda requests
-exports.handleHttpRequest = (request, context, done) => {
-  console.log("!!! REQUEST !!!");
-  console.log(JSON.stringify(request));
-  try {
-    if (isGetProductsRequest(request)) {
-      console.log("GET /products");
-      getProducts(request, done);
-    }
-    if (isGetProductByIdRequest(request)) {
-      console.log("GET /products/{product_id}");
-      getProductById(request, done);
-    }
-    if (isPostProductsRequest(request)) {
-      console.log("POST /products");
-      bulkCreateProducts(request, done);
-    }
-  } catch (e) {
-    done(e, null);
-  }
-};
+module.exports.handler = serverless(app);
