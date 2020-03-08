@@ -1,4 +1,4 @@
-service: product-api
+service: new-product-api
 
 provider:
   name: aws
@@ -8,23 +8,15 @@ provider:
   memorySize: 768
 functions:
   products:
-    handler: index.handler
+    handler: src/index.handler
     events:
       - http:
-          path: products
-          method: get
+          path: /
+          method: ANY
+          cors: true
       - http:
-          path: products/{id}
-          method: get
-      - http:
-          path: products
-          method: post
-      - http:
-          path: products/{id}
-          method: put
-      - http:
-          path: products/{id}
-          method: delete
+          path: /{proxy+}
+          method: ANY
+          cors: true
 plugins:
   - serverless-dotenv-plugin
-  # - serverless-offline
