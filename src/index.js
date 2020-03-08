@@ -43,7 +43,7 @@ const sendResponseWithJsonOrXml = ({ request, response, xmlRoot, payload }) => {
 
 app.post("/login", (request, response) => {
   db.query(
-    "SELECT password, role FROM user WHERE email = ?",
+    "SELECT id, address, first_name, last_name, password, role FROM user WHERE email = ?",
     [request.body.email],
     (error, results) => {
       if (error) {
