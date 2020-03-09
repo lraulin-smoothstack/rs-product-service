@@ -1,5 +1,4 @@
 const accepts = require("accepts");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const express = require("express");
 const js2xmlparser = require("js2xmlparser");
@@ -10,15 +9,9 @@ const db = require("./db");
 
 const app = express();
 
-// create application/json parser
-const jsonParser = bodyParser.json();
-
-// create application/x-www-form-urlencoded parser
-const urlencodedParser = bodyParser.urlencoded({ extended: true });
-
 app.use(cors());
-app.use(urlencodedParser);
-app.use(jsonParser);
+app.use(express.urlencoded());
+app.use(express.json());
 
 const sendResponseWithJsonOrXml = ({ request, response, xmlRoot, payload }) => {
   const accept = accepts(request);
@@ -43,7 +36,7 @@ const sendResponseWithJsonOrXml = ({ request, response, xmlRoot, payload }) => {
 
 app.post("/login", (request, response) => {
   db.query(
-    "SELECT id, address, first_name, last_name, password, role FROM user WHERE email = ?",
+    "SELECT id, email, address, first_name, last_name, password, role FROM user WHERE email = ?",
     [request.body.email],
     (error, results) => {
       if (error) {
@@ -64,25 +57,25 @@ app.post("/login", (request, response) => {
         response.status(401);
         response.send({ message });
       } else {
-        response.setHeader(
-          "Authorization",
-          "Bearer " +
-            jwt.sign(
-              {
-                email: request.body.email,
-                role: results[0].role,
-              },
-              process.env.JWT_SECRET,
-              { expiresIn: "1d" },
-            ),
-        );
         delete results[0].password;
-        response.status(200);
+
+        const userInfo = {
+          ...results[0],
+          jwt: jwt.sign(
+            {
+              email: request.body.email,
+              role: results[0].role,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" },
+          ),
+        };
+
         sendResponseWithJsonOrXml({
           request,
           response,
           xmlRoot: "user",
-          payload: results[0],
+          payload: userInfo,
         });
       }
     },
@@ -216,10 +209,17 @@ app.delete("/products/:id", (request, response) => {
 });
 
 app.post("/orders", (request, response) => {
+  console.log("POST /orders");
+  console.log(request.body);
+  console.log(request.body.product_id);
+  console.log(request.body.user_id);
+  console.log(request.body.quantity);
+  const sql = `INSERT INTO redemption_store.order (${orderTableColumns}) VALUES (${placeHolders(
+    orderTableColumns,
+  )})`;
+  console.log(sql);
   db.query(
-    `INSERT INTO order (${orderTableColumns}) VALUES (${placeHolders(
-      orderTableColumns,
-    )})`,
+    sql,
     [
       request.body.product_id,
       request.body.user_id,
@@ -233,9 +233,11 @@ app.post("/orders", (request, response) => {
     ],
     (error, results) => {
       if (error || results.affectedRows == 0) {
+        console.log(error);
         response.status(400);
         response.send();
       } else {
+        console.log(results);
         response.status(201);
         response.send(results);
       }
