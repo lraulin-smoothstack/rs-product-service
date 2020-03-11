@@ -13,73 +13,170 @@ app.use(cors());
 app.use(express.urlencoded());
 app.use(express.json());
 
+const statusCodes = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  NOT_ACCEPTABLE: 406,
+};
+
 const sendResponseWithJsonOrXml = ({ request, response, xmlRoot, payload }) => {
   const accept = accepts(request);
 
   switch (accept.type(["json", "xml"])) {
     case "json":
       response.setHeader("Content-Type", "application/json");
-      response.status(200);
+      response.status(statusCodes.OK);
       response.send(payload);
       break;
     case "xml":
       response.setHeader("Content-Type", "application/xml");
-      response.status(200);
+      response.status(statusCodes.OK);
       response.send(js2xmlparser.parse(xmlRoot, payload));
       break;
     default:
-      response.status(406);
+      response.status(statusCodes.NOT_ACCEPTABLE);
       response.send();
       break;
   }
 };
 
-app.post("/login", (request, response) => {
-  db.query(
-    "SELECT id, email, address, first_name, last_name, password, role FROM user WHERE email = ?",
-    [request.body.email],
-    (error, results) => {
-      if (error) {
-        console.log("Failed login attempt due to error:");
-        console.log(error);
-        response.status(401);
-        response.send(error);
-      } else if (results.length == 0) {
-        const message =
-          "Failed login attempt: user " + request.body.email + " not found.";
-        console.log(message);
-        response.status(401);
-        response.send({ message });
-      } else if (results[0].password != request.body.password) {
-        const message =
-          "Failed login attempt: Incorrect password for user " +
-          request.body.email;
-        response.status(401);
-        response.send({ message });
-      } else {
-        delete results[0].password;
+const getUserFromEmailSql =
+  "SELECT id, email, address, first_name, last_name, password, phone, role FROM user WHERE email = ?";
 
-        const userInfo = {
-          ...results[0],
-          jwt: jwt.sign(
+app.post("/login", (request, response) => {
+  console.log("POST /login");
+  console.log(request.body);
+  console.log(request.email);
+  db.query(getUserFromEmailSql, [request.body.email], (error, results) => {
+    if (error) {
+      console.log("Failed login attempt due to error:");
+      console.log(error);
+      response.status(statusCodes.UNAUTHORIZED);
+      response.send(error);
+    } else if (results.length == 0) {
+      const message =
+        "Failed login attempt: user " + request.body.email + " not found.";
+      console.log(message);
+      response.status(statusCodes.UNAUTHORIZED);
+      response.send({ message });
+    } else if (results[0].password != request.body.password) {
+      const message =
+        "Failed login attempt: Incorrect password for user " +
+        request.body.email;
+      response.status(statusCodes.UNAUTHORIZED);
+      response.send({ message });
+    } else {
+      delete results[0].password;
+
+      const userInfo = {
+        ...results[0],
+        jwt: jwt.sign(
+          {
+            email: request.body.email,
+            role: results[0].role,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1d" },
+        ),
+      };
+
+      sendResponseWithJsonOrXml({
+        request,
+        response,
+        xmlRoot: "user",
+        payload: userInfo,
+      });
+    }
+  });
+});
+
+app.post("/register", (request, response) => {
+  const { email, password } = request.body;
+  const roles = {
+    CUSTOMER: 1,
+    CLERK: 2,
+    ACCOUNTANT: 3,
+    ADMIN: 4,
+  };
+  const deleted = {
+    FALSE: 0,
+    TRUE: 1,
+  };
+
+  // First check to make sure email is not already registered
+  db.query(getUserFromEmailSql, [email], (error, checkEmailResults) => {
+    if (error) {
+      response.status(statusCodes.UNAUTHORIZED);
+      response.send(error);
+      return;
+    }
+    if (Array.isArray(checkEmailResults) && checkEmailResults[0]) {
+      const message = `Email '${email}' is already registered!`;
+      console.log(message);
+      response.status(statusCodes.BAD_REQUEST);
+      response.send(message);
+      return;
+    }
+
+    // Email doesn't exist; insert new user
+    const insertUserSql =
+      "INSERT INTO user (email, password, role, deleted) VALUES (?, ?, ?, ?)";
+    db.query(
+      insertUserSql,
+      [email, password, roles.CUSTOMER, deleted.TRUE],
+      (error, insertResults) => {
+        if (error) {
+          console.log(error);
+          return;
+        }
+        if (insertResults.affectedRows === 0) {
+          response.status(statusCodes.BAD_REQUEST);
+          response.send(error);
+          return;
+        }
+
+        // Get and return details from newly created user
+        db.query(getUserFromEmailSql, [email], (error, selectResults) => {
+          if (error) {
+            console.log(error);
+          }
+          if (!Array.isArray(selectResults) || !selectResults[0]) {
+            const message = "Newly registered user not found in database!";
+            console.log(message);
+            response.status(status.BAD_REQUEST);
+            response.send(message);
+          }
+
+          const token = jwt.sign(
             {
-              email: request.body.email,
-              role: results[0].role,
+              email: email,
+              role: selectResults[0].role,
             },
             process.env.JWT_SECRET,
             { expiresIn: "1d" },
-          ),
-        };
+          );
 
-        sendResponseWithJsonOrXml({
-          request,
-          response,
-          xmlRoot: "user",
-          payload: userInfo,
+          delete selectResults[0].password;
+          const payload = {
+            ...selectResults[0],
+            jwt: token,
+          };
+
+          sendResponseWithJsonOrXml({
+            request,
+            response,
+            xmlRoot: "user",
+            payload,
+          });
         });
-      }
-    },
-  );
+      },
+    );
+  });
 });
 
 // All product table columns (except id) for insert
@@ -104,7 +201,7 @@ app.get("/products", (request, response) => {
     [department, category],
     (error, results) => {
       if (error) {
-        response.status(404);
+        response.status(statusCodes.NOT_FOUND);
         response.send();
       } else {
         sendResponseWithJsonOrXml({
@@ -119,28 +216,27 @@ app.get("/products", (request, response) => {
 });
 
 app.get("/products/:id", (request, response) => {
-  db.query(
-    "SELECT * FROM product where id = ?",
-    [request.params.id],
-    (error, results) => {
-      if (error || results.length == 0) {
-        response.status(404);
-        response.send();
-      } else {
-        sendResponseWithJsonOrXml({
-          request,
-          response,
-          xmlRoot: "products",
-          payload: results,
-        });
-      }
-    },
-  );
+  const { id } = request.params;
+  db.query("SELECT * FROM product where id = ?", [id], (error, results) => {
+    if (error || results.length == 0) {
+      response.status(statusCodes.NOT_FOUND);
+      response.send(error || { message: `Product with id ${id}` });
+    } else {
+      sendResponseWithJsonOrXml({
+        request,
+        response,
+        xmlRoot: "products",
+        payload: results,
+      });
+    }
+  });
 });
 
 app.post("/products", (request, response) => {
   db.query(
-    `INSERT INTO product (${productTableColumns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO product (${productTableColumns}) VALUES (${placeHolders(
+      productTableColumns,
+    )})`,
     [
       request.body.name,
       request.body.description,
@@ -155,11 +251,11 @@ app.post("/products", (request, response) => {
     ],
     (error, results) => {
       if (error || results.affectedRows == 0) {
-        response.status(400);
-        response.send();
+        response.status(statusCodes.BAD_REQUEST);
+        response.send(error);
       } else {
-        response.status(201);
-        response.send();
+        response.status(statusCodes.OK);
+        response.send(results);
       }
     },
   );
@@ -183,11 +279,11 @@ app.put("/products/:id", (request, response) => {
 
   db.query(sql, values, (error, results) => {
     if (error || results.affectedRows == 0) {
-      response.status(400);
-      response.send();
+      response.status(statusCodes.BAD_REQUEST);
+      response.send(error);
     } else {
-      response.status(204);
-      response.send();
+      response.status(statusCodes.OK);
+      response.send(results);
     }
   });
 });
@@ -198,11 +294,11 @@ app.delete("/products/:id", (request, response) => {
     [1, request.params.id],
     (error, results) => {
       if (error || results.affectedRows == 0) {
-        response.status(400);
-        response.send();
+        response.status(statusCodes.BAD_REQUEST);
+        response.send(error);
       } else {
-        response.status(204);
-        response.send();
+        response.status(statusCodes.OK);
+        response.send(results);
       }
     },
   );
@@ -243,6 +339,41 @@ app.post("/orders", (request, response) => {
       }
     },
   );
+});
+
+const tokenRxResult = t =>
+  /[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/.exec(t);
+
+const getToken = authorizationToken =>
+  tokenRxResult(authorizationToken) && tokenRxResult(authorizationToken)[0];
+
+app.put("/users/:id", (request, response) => {
+  const { id } = request.params;
+  const { email, address, first_name, last_name, phone } = request.body;
+  const token = getToken(request.headers.authorization);
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const tokenEmail = decoded.email;
+
+  if (email !== tokenEmail) {
+    response.status(statusCodes.UNAUTHORIZED);
+    response.send({ message: "Email does not match authorization token." });
+    return;
+  }
+
+  const sql =
+    "UPDATE user SET address = ?, first_name = ?, last_name = ?, phone = ? WHERE id = ?";
+  const values = [email, address, first_name, last_name, phone, id];
+
+  db.query(sql, values, (error, results) => {
+    if (error || results.affectedRows == 0) {
+      response.status(statusCodes.BAD_REQUEST);
+      response.send(error);
+    } else {
+      response.status(statusCodes.OK);
+      response.send(results);
+    }
+  });
 });
 
 module.exports.handler = serverless(app);

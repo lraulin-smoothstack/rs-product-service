@@ -7,7 +7,7 @@ provider:
   region: us-east-1
   memorySize: 768
 functions:
-  products:
+  producets:
     handler: src/index.handler
     events:
       - http:
