@@ -350,15 +350,21 @@ const getToken = authorizationToken =>
 app.put("/users/:id", (request, response) => {
   const { id } = request.params;
   const { email, address, first_name, last_name, phone } = request.body;
+
   const token = getToken(request.headers.authorization);
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const tokenEmail = decoded.email;
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  const tokenEmail = decoded.email;
-
-  if (email !== tokenEmail) {
+    if (email !== tokenEmail) {
+      response.status(statusCodes.UNAUTHORIZED);
+      response.send({ message: "Email does not match authorization token." });
+      return;
+    }
+  } catch (e) {
+    console.log(e);
     response.status(statusCodes.UNAUTHORIZED);
-    response.send({ message: "Email does not match authorization token." });
-    return;
+    response.send(e);
   }
 
   const sql =
